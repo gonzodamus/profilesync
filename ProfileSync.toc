@@ -1,0 +1,12 @@
+## Interface: 100200
+## Title: ProfileSync
+## Notes: Sync addon profiles across characters
+## Author: Your Name
+## Version: 1.0.0
+## SavedVariables: ProfileSyncDB
+
+# Core files
+core.lua
+handlers.lua
+saved.lua
+ui.lua

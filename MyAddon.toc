@@ -1,0 +1,10 @@
+## Interface: 100200
+## Title: MyAddon
+## Notes: A custom World of Warcraft addon
+## Author: Your Name
+## Version: 1.0.0
+## SavedVariables: MyAddonDB
+
+# Core files
+MyAddon.lua
+MyAddon.xml

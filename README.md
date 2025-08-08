@@ -1,163 +1,200 @@
-# ProfileSync - World of Warcraft Addon
+# ProfileSync
 
-A modern, clean addon that allows you to sync addon profiles across characters. No more manually configuring Details, Plater, Cell, and Bartender4 on every new character!
+A World of Warcraft addon that synchronizes addon profiles across characters, with robust API versioning and compatibility checking.
 
-## 🚀 Features
+## Features
 
-- **Multi-Addon Support**: Details, Plater, Bartender4, Cell
-- **Per-Character Settings**: Each character remembers their preferred profiles
-- **Auto-Apply**: Automatically apply profiles to new characters
-- **Modern UI**: Clean, intuitive interface that fits WoW's design
-- **Progress Tracking**: See real-time progress when applying profiles
-- **Smart Reload Detection**: Warns when UI reload is needed
-- **Profile Validation**: Warns about missing profiles
+- **Cross-character profile synchronization** for supported addons
+- **API versioning and compatibility checking** to handle addon updates
+- **Auto-apply profiles** for new characters
+- **Comprehensive error handling** with detailed feedback
+- **User-friendly interface** with compatibility indicators
+- **Fallback methods** for API changes
 
-## 📦 Installation
+## Supported Addons
 
-1. **Download**: Extract the ProfileSync folder to your WoW AddOns directory:
-   - **Windows**: `C:\Program Files\World of Warcraft\_retail_\Interface\AddOns\ProfileSync\`
-   - **Mac**: `/Applications/World of Warcraft/_retail_/Interface/AddOns/ProfileSync/`
+ProfileSync currently supports the following addons with version compatibility:
 
-2. **Files**: Ensure these files are in the ProfileSync folder:
-   - `ProfileSync.toc`
-   - `core.lua`
-   - `handlers.lua`
-   - `saved.lua`
-   - `ui.lua`
+### Details
+- **Versions:** 3.0.0 - 4.0.0
+- **API Methods:** `Details:GetProfileList()`, `Details:SetProfile()`
+- **Fallback:** `Details.profile:GetProfileList()`, `Details.profile:SetProfile()`
+- **Reload Required:** No
 
-3. **Enable**: Restart WoW or reload UI (`/reload`)
+### Plater
+- **Versions:** 1.0.0 - 2.0.0
+- **API Methods:** `Plater:GetProfileList()`, `Plater:SwitchProfile()`
+- **Fallback:** `Plater.db:GetProfileList()`, `Plater.db:SetProfile()`
+- **Reload Required:** Yes
 
-## 🎮 Usage
+### Bartender4
+- **Versions:** 4.0.0 - 5.0.0
+- **API Methods:** `Bartender4.db:GetProfileList()`, `Bartender4.db:SetProfile()`
+- **Fallback:** `Bartender4:GetProfileList()`, `Bartender4:SetProfile()`
+- **Reload Required:** No
+
+### Cell
+- **Versions:** 1.0.0 - 2.0.0
+- **API Methods:** Direct database access (`CellDB.profiles`, `CellDB["profile"]`)
+- **Fallback:** `Cell:GetProfileList()`, `Cell:SetProfile()`
+- **Reload Required:** Yes
+
+## Installation
+
+1. Download the addon files
+2. Place them in your `World of Warcraft/_retail_/Interface/AddOns/ProfileSync/` directory
+3. Restart World of Warcraft or reload the UI
+4. Type `/profilesync` to open the interface
+
+## Usage
 
 ### Basic Commands
-- `/profilesync` or `/ps` - Open the main UI
-- `/profilesync help` - Show help
-- `/profilesync apply` - Apply all saved profiles
+
+- `/profilesync` or `/ps` - Open the main interface
+- `/profilesync help` - Show available commands
+- `/profilesync version` - Show addon version
+- `/profilesync apply` - Apply all configured profiles
 - `/profilesync reset` - Reset character data
+- `/profilesync compatibility` - Show compatibility report
+- `/profilesync status` - Show detailed status report
 
 ### Setting Up Profiles
 
-1. **Open UI**: Type `/profilesync` in chat
-2. **Configure Addons**: For each installed addon, select your preferred profile from the dropdown
-3. **Auto-Apply**: Check the box to automatically apply profiles to new characters
-4. **Apply**: Click "Apply Profiles" to apply all settings
+1. Open the ProfileSync interface (`/profilesync`)
+2. Enable "Auto-apply profiles on new characters" if desired
+3. For each supported addon:
+   - Select the profile you want to use from the dropdown
+   - The interface shows version compatibility with ✓/✗ indicators
+4. Click "Apply Profiles" to test your configuration
 
-### Supported Addons
+### Auto-Apply Feature
 
-| Addon | Profile Method | Reload Required |
-|-------|---------------|-----------------|
-| Details | `Details:SetProfile()` | No |
-| Plater | `Plater:SwitchProfile()` | Yes |
-| Bartender4 | `Bartender4.db:SetProfile()` | No |
-| Cell | `CellDB["profile"] = ...` | Yes |
+When enabled, ProfileSync will automatically apply saved profiles when you log into a new character for the first time. This is useful for maintaining consistent settings across all your characters.
 
-## 🎨 UI Features
+## API Compatibility Matrix
 
-- **Clean Design**: Uses Blizzard's UI templates for consistency
-- **Multi-Column Layout**: Addon names on left, profile selections on right
-- **Scrollable List**: Handles many addons gracefully
-- **Progress Tracking**: Shows current progress during application
-- **Drag & Drop**: Move the window anywhere on screen
-- **Auto-Detection**: Only shows installed addons
+The addon uses a sophisticated versioning system to handle API changes in supported addons:
 
-## 🔧 Technical Details
+### Version Detection
 
-### Saved Variables Structure
+ProfileSync attempts to detect addon versions using multiple methods:
+1. `GetAddOnMetadata(addonName, "Version")` - Standard WoW API
+2. Addon-specific version variables (e.g., `Details.version`)
+3. Fallback to "0.0.0" if no version is detected
+
+### Compatibility Checking
+
+For each supported addon, ProfileSync maintains:
+- **Minimum Version:** Oldest supported version
+- **Maximum Version:** Newest supported version
+- **API Versions:** Specific API implementations for different version ranges
+
+### Fallback Methods
+
+When an addon's API changes between versions, ProfileSync includes fallback methods:
+- Primary API methods for current versions
+- Alternative API methods for newer versions
+- Graceful degradation when APIs are unavailable
+
+## Development
+
+### Adding Support for New Addons
+
+To add support for a new addon, update the `APICompatibility` table in `handlers.lua`:
+
 ```lua
-ProfileSyncDB = {
-  ["Realm-CharacterName"] = {
-    addonProfiles = {
-      ["Details"] = "Raid DPS",
-      ["Plater"] = "Clean Tank",
-      ["Bartender4"] = "Standard",
-      ["Cell"] = "Grid Layout",
-    },
-    autoApply = true,
-    profilesApplied = false
-  }
+PS.APICompatibility["NewAddon"] = {
+    minVersion = "1.0.0",
+    maxVersion = "2.0.0",
+    apiVersions = {
+        ["1.0.0"] = {
+            getProfiles = function()
+                -- Return list of available profiles
+                return NewAddon:GetProfiles()
+            end,
+            setProfile = function(profileName)
+                -- Apply the specified profile
+                NewAddon:SetProfile(profileName)
+                return true
+            end
+        },
+        ["2.0.0"] = {
+            getProfiles = function()
+                -- Updated API for newer versions
+                return NewAddon.db:GetProfiles()
+            end,
+            setProfile = function(profileName)
+                -- Updated API for newer versions
+                NewAddon.db:SetProfile(profileName)
+                return true
+            end
+        }
+    }
 }
 ```
 
-### Addon Detection
-- Only shows addons that are currently installed and loaded
-- Automatically refreshes when entering the world
-- Caches profile lists for performance
+### Version Comparison
+
+The addon uses semantic versioning comparison:
+- Major.Minor.Patch format (e.g., "1.2.3")
+- Handles missing version components gracefully
+- Supports version ranges for compatibility
 
 ### Error Handling
-- Continues applying profiles even if some fail
-- Reports all successes and failures at the end
-- Warns about missing profiles before applying
 
-## 🛠️ Troubleshooting
+ProfileSync provides comprehensive error handling:
+- Version compatibility validation
+- API availability checking
+- Profile existence verification
+- Detailed error messages for troubleshooting
+
+## Troubleshooting
 
 ### Common Issues
 
-**Addon not showing in list**
-- Make sure the addon is installed and enabled
-- Try `/reload` to refresh the addon list
+1. **"Addon not supported"**
+   - The addon isn't in the compatibility matrix
+   - Check if the addon is supported or needs to be added
 
-**Profiles not applying**
-- Check that the profile name exists in the addon
-- Try refreshing the profile list in the dropdown
-- Some addons require a UI reload after profile changes
+2. **"Version incompatibility"**
+   - The addon version is outside the supported range
+   - Update the addon or contact the developer to add support
 
-**Auto-apply not working**
-- Ensure "Auto-apply profiles on new characters" is checked
-- Auto-apply only works on characters that haven't had profiles applied before
+3. **"API not available"**
+   - The addon's API has changed
+   - Check for addon updates or report the issue
 
-### Debug Commands
-- `/profilesync reset` - Reset all character data
-- `/profilesync version` - Check addon version
-- `/dump ProfileSyncDB` - View saved variables
+4. **"Profile not found"**
+   - The selected profile doesn't exist in the addon
+   - Refresh the profile list or create the profile first
 
-## 🔮 Future Features
+### Debug Information
 
-- **Companion Desktop App**: Sync settings across computers
-- **Profile Packs**: Share and import profile configurations
-- **Spec-Based Profiles**: Different profiles for different specializations
-- **WeakAuras Integration**: Import/export WeakAuras strings
-- **Cloud Backup**: Automatic backup to cloud storage
+Use `/profilesync status` to get detailed information about:
+- Addon compatibility status
+- Version information
+- Saved profile configuration
+- Auto-apply settings
 
-## 📝 Development
+## Contributing
 
-### Adding New Addons
-To add support for a new addon, edit `handlers.lua`:
+When contributing to ProfileSync:
 
-```lua
-self.AddonHandlers["NewAddon"] = {
-    isLoaded = function() return IsAddOnLoaded("NewAddon") end,
-    getProfiles = function()
-        -- Return list of available profiles
-        return {"Profile1", "Profile2"}
-    end,
-    setProfile = function(profileName)
-        -- Apply the profile
-        NewAddon:SetProfile(profileName)
-        return true
-    end,
-    requiresReload = false
-}
-```
+1. **Test thoroughly** with different addon versions
+2. **Update the compatibility matrix** when adding new addons
+3. **Include fallback methods** for API changes
+4. **Document version requirements** clearly
+5. **Test error conditions** and edge cases
 
-### File Structure
-```
-ProfileSync/
-├── ProfileSync.toc      # Addon metadata
-├── core.lua            # Main logic and events
-├── handlers.lua        # Addon-specific handlers
-├── saved.lua           # Saved variables management
-├── ui.lua              # User interface
-└── README.md           # This file
-```
+## License
 
-## 🤝 Contributing
+This addon is provided as-is for personal use. Please respect the licenses of supported addons when using this tool.
 
-Feel free to submit issues or feature requests! The addon is designed to be easily extensible for new addons.
+## Version History
 
-## 📄 License
-
-This addon is provided as-is for personal use. Feel free to modify and distribute.
-
----
-
-**ProfileSync** - Making WoW addon management effortless! 🎯
+### 1.0.0
+- Initial release
+- Support for Details, Plater, Bartender4, and Cell
+- API versioning and compatibility checking
+- Auto-apply functionality
+- Comprehensive error handling

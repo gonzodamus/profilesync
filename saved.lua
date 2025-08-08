@@ -5,21 +5,29 @@ local addonName, addon = ...
 ProfileSync = ProfileSync or {}
 local PS = ProfileSync
 
--- Initialize saved variables
+-- Initialize saved variables container (no character-specific access here)
 function PS:InitializeDB()
     ProfileSyncDB = ProfileSyncDB or {}
-    
-    -- Ensure character-specific data exists
+    self.db = ProfileSyncDB
+    -- self.charData will be set on PLAYER_LOGIN by InitializeCharacterData
+end
+
+-- Initialize character-specific data (call on PLAYER_LOGIN)
+function PS:InitializeCharacterData()
+    if not self.db then
+        self:InitializeDB()
+    end
+
     local charKey = self:GetCharacterKey()
-    ProfileSyncDB[charKey] = ProfileSyncDB[charKey] or {}
-    
-    -- Initialize character data structure
-    local charData = ProfileSyncDB[charKey]
+    self.db[charKey] = self.db[charKey] or {}
+
+    local charData = self.db[charKey]
     charData.addonProfiles = charData.addonProfiles or {}
     charData.autoApply = charData.autoApply or false
     charData.profilesApplied = charData.profilesApplied or false
-    
-    self.db = ProfileSyncDB
+    -- Settings
+    charData.allowUntested = charData.allowUntested or false
+
     self.charData = charData
 end
 
@@ -60,6 +68,17 @@ function PS:GetAutoApply()
     return self.charData.autoApply
 end
 
+-- Toggle for allowing untested versions
+function PS:SetAllowUntested(enabled)
+    if not self.charData then return end
+    self.charData.allowUntested = enabled and true or false
+end
+
+function PS:GetAllowUntested()
+    if not self.charData then return false end
+    return self.charData.allowUntested == true
+end
+
 -- Mark profiles as applied for this character
 function PS:MarkProfilesApplied()
     if not self.charData then return end
@@ -78,4 +97,5 @@ function PS:ResetCharacterData()
     self.charData.addonProfiles = {}
     self.charData.autoApply = false
     self.charData.profilesApplied = false
+    self.charData.allowUntested = false
 end

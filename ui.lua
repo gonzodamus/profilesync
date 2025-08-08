@@ -50,9 +50,22 @@ function PS:CreateContent()
     end)
     autoApplyCheckbox.text:SetText("Auto-apply profiles on new characters")
     
+    -- Keep a direct reference for robust updates
+    self.autoApplyCheckbox = autoApplyCheckbox
+
+    -- Allow untested versions checkbox
+    local untestedCheckbox = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
+    untestedCheckbox:SetPoint("TOPLEFT", 20, -75)
+    untestedCheckbox:SetScript("OnClick", function(self)
+        PS:SetAllowUntested(self:GetChecked())
+        PS:UpdateUI()
+    end)
+    untestedCheckbox.text:SetText("Allow untested addon versions")
+    self.untestedCheckbox = untestedCheckbox
+    
     -- Content area
     local contentFrame = CreateFrame("Frame", nil, frame)
-    contentFrame:SetPoint("TOPLEFT", 20, -80)
+    contentFrame:SetPoint("TOPLEFT", 20, -110)
     contentFrame:SetPoint("BOTTOMRIGHT", -20, 60)
     
     -- Scroll frame for addon list
@@ -70,13 +83,23 @@ function PS:CreateContent()
     -- Apply button
     local applyButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     applyButton:SetSize(120, 30)
-    applyButton:SetPoint("BOTTOM", 0, 20)
+    applyButton:SetPoint("BOTTOM", 70, 20)
     applyButton:SetText("Apply Profiles")
     applyButton:SetScript("OnClick", function()
         PS:ApplyAllProfiles()
     end)
-    
     self.applyButton = applyButton
+
+    -- Refresh button
+    local refreshButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    refreshButton:SetSize(120, 30)
+    refreshButton:SetPoint("BOTTOM", -70, 20)
+    refreshButton:SetText("Refresh")
+    refreshButton:SetScript("OnClick", function()
+        PS:ClearProfileCache()
+        PS:UpdateUI()
+    end)
+    self.refreshButton = refreshButton
     
     -- Progress text
     local progressText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -92,15 +115,27 @@ function PS:CreateAddonRow(addonName, yOffset)
     row:SetSize(440, 30)
     row:SetPoint("TOPLEFT", 0, yOffset)
     
-    -- Addon name
+    -- Addon name with version
     local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     nameText:SetPoint("LEFT", 0, 0)
     nameText:SetText(addonName)
     nameText:SetWidth(150)
     
+    -- Version text
+    local versionText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    versionText:SetPoint("LEFT", 160, 0)
+    versionText:SetWidth(80)
+    versionText:SetText("")
+    
+    -- Compatibility indicator
+    local compatIcon = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    compatIcon:SetPoint("LEFT", 250, 0)
+    compatIcon:SetWidth(20)
+    compatIcon:SetText("")
+    
     -- Profile dropdown
     local dropdown = CreateFrame("Frame", "ProfileSyncDropdown" .. addonName, row, "UIDropDownMenuTemplate")
-    dropdown:SetPoint("LEFT", 160, 0)
+    dropdown:SetPoint("LEFT", 280, 0)
     dropdown:SetScript("OnShow", function()
         PS:InitializeDropdown(dropdown, addonName)
     end)
@@ -108,6 +143,8 @@ function PS:CreateAddonRow(addonName, yOffset)
     -- Store references
     row.addonName = addonName
     row.nameText = nameText
+    row.versionText = versionText
+    row.compatIcon = compatIcon
     row.dropdown = dropdown
     
     self.addonRows[addonName] = row
@@ -165,20 +202,54 @@ function PS:InitializeDropdown(dropdown, addonName)
     end
 end
 
+-- Update addon row with version and compatibility info
+function PS:UpdateAddonRow(row, addonInfo)
+    if not addonInfo then return end
+    
+    -- Update version text
+    row.versionText:SetText("v" .. addonInfo.version)
+    
+    -- Update compatibility indicator
+    if addonInfo.isCompatible then
+        row.compatIcon:SetText("|cFF00FF00✓|r")
+        row.compatIcon:SetTextColor(0, 1, 0)
+        
+        -- Ensure dropdown enabled
+        UIDropDownMenu_EnableDropDown(row.dropdown)
+        row.dropdown:Enable() -- just in case
+        row.dropdown:SetScript("OnEnter", nil)
+        row.dropdown:SetScript("OnLeave", nil)
+    else
+        row.compatIcon:SetText("|cFFFF0000✗|r")
+        row.compatIcon:SetTextColor(1, 0, 0)
+        
+        -- Disable dropdown and explain why
+        UIDropDownMenu_DisableDropDown(row.dropdown)
+        row.dropdown:Disable()
+        row.dropdown:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Incompatible Version")
+            GameTooltip:AddLine(addonInfo.compatibilityError or "This addon version is not supported.", 1, 0, 0)
+            GameTooltip:Show()
+        end)
+        row.dropdown:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+    end
+end
+
 -- Update UI
 function PS:UpdateUI()
     if not self.mainFrame or not self.mainFrame:IsShown() then
         return
     end
     
-    -- Update auto-apply checkbox
-    local checkbox = self.mainFrame:GetChildren()
-    for i = 1, self.mainFrame:GetNumChildren() do
-        local child = select(i, self.mainFrame:GetChildren())
-        if child:GetObjectType() == "CheckButton" then
-            child:SetChecked(PS:GetAutoApply())
-            break
-        end
+    -- Update checkboxes directly
+    if self.autoApplyCheckbox then
+        self.autoApplyCheckbox:SetChecked(PS:GetAutoApply())
+    end
+    if self.untestedCheckbox then
+        self.untestedCheckbox:SetChecked(PS:GetAllowUntested())
     end
     
     -- Clear existing rows
@@ -186,16 +257,20 @@ function PS:UpdateUI()
         row:Hide()
     end
     
-    -- Get installed addons
+    -- Get installed addons with version info
     local installedAddons = PS:GetInstalledAddons()
     
     -- Create rows for installed addons
     local yOffset = 0
-    for _, addonName in ipairs(installedAddons) do
-        local row = self.addonRows[addonName]
+    for _, addonInfo in ipairs(installedAddons) do
+        local row = self.addonRows[addonInfo.name]
         if not row then
-            row = self:CreateAddonRow(addonName, -yOffset)
+            row = self:CreateAddonRow(addonInfo.name, -yOffset)
         end
+        
+        -- Update row with version and compatibility info
+        self:UpdateAddonRow(row, addonInfo)
+        
         row:Show()
         row:SetPoint("TOPLEFT", 0, -yOffset)
         yOffset = yOffset + 35

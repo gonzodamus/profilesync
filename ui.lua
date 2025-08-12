@@ -35,6 +35,13 @@ function PS:CreateMainFrame()
         frame:Hide()
     end)
     
+    -- Add escape key support
+    frame:SetScript("OnKeyDown", function(self, key)
+        if key == "ESCAPE" then
+            self:Hide()
+        end
+    end)
+    
     self.mainFrame = frame
 end
 
@@ -204,10 +211,15 @@ end
 
 -- Update addon row with version and compatibility info
 function PS:UpdateAddonRow(row, addonInfo)
-    if not addonInfo then return end
+    if not row or not addonInfo then return end
+    
+    -- Validate required fields
+    if not row.versionText or not row.compatIcon or not row.dropdown then
+        return
+    end
     
     -- Update version text
-    row.versionText:SetText("v" .. addonInfo.version)
+    row.versionText:SetText("v" .. (addonInfo.version or "0.0.0"))
     
     -- Update compatibility indicator
     if addonInfo.isCompatible then

@@ -32,6 +32,11 @@ function PS:OnEnable()
         self:InitializeHandlers()
     end
 
+    -- Initialize UI
+    if self.InitializeUI then
+        self:InitializeUI()
+    end
+
     -- Register runtime events (no ADDON_LOADED here)
     self:RegisterEvents()
 
@@ -91,8 +96,12 @@ end
 
 -- Handle entering world
 function PS:OnPlayerEnteringWorld()
-    -- Refresh profile cache when entering world
-    self:ClearProfileCache()
+    -- Only refresh profile cache if we haven't done so recently
+    -- This prevents unnecessary cache clearing on every zone change
+    if not self._cacheRefreshed then
+        self:ClearProfileCache()
+        self._cacheRefreshed = true
+    end
 end
 
 -- Auto-apply profiles for new characters
@@ -251,6 +260,13 @@ function PS:ApplyAllProfiles(silent)
     end
     
     local savedProfiles = self:GetAllSavedProfiles()
+    if not savedProfiles then
+        if not silent then
+            print("|cFFFF0000ProfileSync|r: Failed to get saved profiles.")
+        end
+        return
+    end
+    
     self:Debug("Starting apply with " .. tostring((savedProfiles and next(savedProfiles)) and (function(tbl) local c=0 for _ in pairs(tbl) do c=c+1 end return c end)(savedProfiles) or 0) .. " saved entries")
     if not next(savedProfiles) then
         if not silent then
@@ -343,6 +359,21 @@ function PS:ProcessNextProfile(silent)
     end
     
     local item = self.applyQueue[self.currentIndex]
+    if not item or not item.addon or not item.profile then
+        -- Invalid queue item, skip and continue
+        table.insert(self.results, {
+            addon = item and item.addon or "Unknown",
+            profile = item and item.profile or "Unknown",
+            success = false,
+            error = "Invalid queue item",
+            requiresReload = false
+        })
+        C_Timer.After(0.1, function()
+            self:ProcessNextProfile(silent)
+        end)
+        return
+    end
+    
     self:Debug("Applying [" .. tostring(self.currentIndex) .. "/" .. tostring(#self.applyQueue) .. "] " .. item.addon .. " -> " .. tostring(item.profile))
     local success, error, requiresReload = self:ApplyProfile(item.addon, item.profile)
     

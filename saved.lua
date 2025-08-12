@@ -9,6 +9,10 @@ local PS = ProfileSync
 function PS:InitializeDB()
     ProfileSyncDB = ProfileSyncDB or {}
     self.db = ProfileSyncDB
+
+    -- Initialize global (account-wide) storage for addon profiles
+    self.db.addonProfiles = self.db.addonProfiles or {}
+    self.db._migratedToGlobal = self.db._migratedToGlobal or false
     -- self.charData will be set on PLAYER_LOGIN by InitializeCharacterData
 end
 
@@ -22,7 +26,23 @@ function PS:InitializeCharacterData()
     self.db[charKey] = self.db[charKey] or {}
 
     local charData = self.db[charKey]
-    charData.addonProfiles = charData.addonProfiles or {}
+    -- Backward compatibility: migrate any legacy per-character addonProfiles to global once
+    if not self.db._migratedToGlobal then
+        -- Merge any existing per-character addonProfiles tables into the global table
+        for key, data in pairs(self.db) do
+            if type(data) == "table" and data.addonProfiles and type(data.addonProfiles) == "table" then
+                for addonName, profileName in pairs(data.addonProfiles) do
+                    if self.db.addonProfiles[addonName] == nil then
+                        self.db.addonProfiles[addonName] = profileName
+                    end
+                end
+                -- Leave legacy data intact to avoid surprising users; future saves will use global
+            end
+        end
+        self.db._migratedToGlobal = true
+    end
+
+    -- Character-scoped settings/state
     charData.autoApply = charData.autoApply or false
     charData.profilesApplied = charData.profilesApplied or false
     -- Settings
@@ -38,22 +58,23 @@ function PS:GetCharacterKey()
     return realm .. "-" .. name
 end
 
--- Save addon profile mapping
+-- Save addon profile mapping (account-wide)
 function PS:SaveAddonProfile(addonName, profileName)
-    if not self.charData then return end
-    self.charData.addonProfiles[addonName] = profileName
+    if not self.db then return end
+    -- nil clears the mapping
+    self.db.addonProfiles[addonName] = profileName
 end
 
--- Get saved profile for an addon
+-- Get saved profile for an addon (account-wide)
 function PS:GetSavedProfile(addonName)
-    if not self.charData then return nil end
-    return self.charData.addonProfiles[addonName]
+    if not self.db then return nil end
+    return self.db.addonProfiles[addonName]
 end
 
--- Get all saved addon profiles
+-- Get all saved addon profiles (account-wide)
 function PS:GetAllSavedProfiles()
-    if not self.charData then return {} end
-    return self.charData.addonProfiles
+    if not self.db then return {} end
+    return self.db.addonProfiles
 end
 
 -- Set auto-apply setting
@@ -94,7 +115,7 @@ end
 -- Reset character data (for testing)
 function PS:ResetCharacterData()
     if not self.charData then return end
-    self.charData.addonProfiles = {}
+    -- Do not clear global addonProfiles here; this is character-scoped reset
     self.charData.autoApply = false
     self.charData.profilesApplied = false
     self.charData.allowUntested = false

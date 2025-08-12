@@ -33,9 +33,9 @@ PS.APICompatibility = {
                 setProfile = function(profileName)
                     if Details and Details.SetProfile then
                         Details:SetProfile(profileName)
-                        return true
+                        return true, nil, false
                     end
-                    return false, "Details API not available"
+                    return false, "Details API not available", false
                 end
             },
             ["4.0.0"] = {
@@ -52,14 +52,14 @@ PS.APICompatibility = {
                 setProfile = function(profileName)
                     if Details and Details.SetProfile then
                         Details:SetProfile(profileName)
-                        return true
+                        return true, nil, false
                     end
                     -- Fallback for newer versions
                     if Details and Details.profile and Details.profile:SetProfile then
                         Details.profile:SetProfile(profileName)
-                        return true
+                        return true, nil, false
                     end
-                    return false, "Details API not available"
+                    return false, "Details API not available", false
                 end
             }
         }
@@ -78,9 +78,9 @@ PS.APICompatibility = {
                 setProfile = function(profileName)
                     if Plater and Plater.SwitchProfile then
                         Plater:SwitchProfile(profileName)
-                        return true
+                        return true, nil, false
                     end
-                    return false, "Plater API not available"
+                    return false, "Plater API not available", false
                 end
             },
             ["2.0.0"] = {
@@ -97,14 +97,14 @@ PS.APICompatibility = {
                 setProfile = function(profileName)
                     if Plater and Plater.SwitchProfile then
                         Plater:SwitchProfile(profileName)
-                        return true
+                        return true, nil, false
                     end
                     -- Fallback for newer versions
                     if Plater and Plater.db and Plater.db:SetProfile then
                         Plater.db:SetProfile(profileName)
-                        return true
+                        return true, nil, false
                     end
-                    return false, "Plater API not available"
+                    return false, "Plater API not available", false
                 end
             }
         }
@@ -123,9 +123,9 @@ PS.APICompatibility = {
                 setProfile = function(profileName)
                     if Bartender4 and Bartender4.db and Bartender4.db:SetProfile then
                         Bartender4.db:SetProfile(profileName)
-                        return true
+                        return true, nil, false
                     end
-                    return false, "Bartender4 API not available"
+                    return false, "Bartender4 API not available", false
                 end
             },
             ["5.0.0"] = {
@@ -142,14 +142,14 @@ PS.APICompatibility = {
                 setProfile = function(profileName)
                     if Bartender4 and Bartender4.db and Bartender4.db:SetProfile then
                         Bartender4.db:SetProfile(profileName)
-                        return true
+                        return true, nil, false
                     end
                     -- Fallback for newer versions
                     if Bartender4 and Bartender4:SetProfile then
                         Bartender4:SetProfile(profileName)
-                        return true
+                        return true, nil, false
                     end
-                    return false, "Bartender4 API not available"
+                    return false, "Bartender4 API not available", false
                 end
             }
         }
@@ -171,9 +171,9 @@ PS.APICompatibility = {
                 setProfile = function(profileName)
                     if CellDB then
                         CellDB["profile"] = profileName
-                        return true
+                        return true, nil, false
                     end
-                    return false, "Cell API not available"
+                    return false, "Cell API not available", false
                 end
             },
             ["2.0.0"] = {
@@ -193,14 +193,14 @@ PS.APICompatibility = {
                 setProfile = function(profileName)
                     if CellDB then
                         CellDB["profile"] = profileName
-                        return true
+                        return true, nil, false
                     end
                     -- Fallback for newer versions
                     if Cell and Cell.SetProfile then
                         Cell:SetProfile(profileName)
-                        return true
+                        return true, nil, false
                     end
-                    return false, "Cell API not available"
+                    return false, "Cell API not available", false
                 end
             }
         }
@@ -373,11 +373,11 @@ function PS:InitializeHandlers()
                 
                 local apiVersion = compatibility.apiVersions[bestAPIVersion]
                 if apiVersion and apiVersion.setProfile then
-                    local ok, err = apiVersion.setProfile(profileName)
+                    local ok, err, requiresReload = apiVersion.setProfile(profileName)
                     if ok and message then
                         PS:Print(string.format("%s v%s applied with untested compatibility.", addonName, version))
                     end
-                    return ok, err
+                    return ok, err, requiresReload
                 end
                 
                 return false, string.format("API not available for %s version %s", addonName, version)
@@ -468,7 +468,7 @@ function PS:ApplyProfile(addonName, profileName)
     
     local success, error, requiresReload = handler.setProfile(profileName)
     if success then
-        return true, nil, handler.requiresReload
+        return true, nil, requiresReload
     else
         return false, error or "Failed to apply profile"
     end

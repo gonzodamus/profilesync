@@ -1,4 +1,4 @@
-## Interface: 100200
+## Interface: 100205
 ## Title: ProfileSync
 ## Notes: Sync addon profiles across characters
 ## Author: Your Name

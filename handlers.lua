@@ -5,6 +5,21 @@ local addonName, addon = ...
 ProfileSync = ProfileSync or {}
 local PS = ProfileSync
 
+-- Retail/11.x API wrappers
+local function IsAddOnLoaded(addon)
+    if C_AddOns and C_AddOns.IsAddOnLoaded then
+        return C_AddOns.IsAddOnLoaded(addon)
+    end
+    return _G.IsAddOnLoaded(addon)
+end
+
+local function GetAddOnMetadata(addon, field)
+    if C_AddOns and C_AddOns.GetAddOnMetadata then
+        return C_AddOns.GetAddOnMetadata(addon, field)
+    end
+    return _G.GetAddOnMetadata(addon, field)
+end
+
 -- Addon handlers registry
 PS.AddonHandlers = {}
 
@@ -242,7 +257,7 @@ end
 -- Get addon version
 function PS:GetAddonVersion(addonName)
     local version = GetAddOnMetadata(addonName, "Version")
-    if not version then
+    if not version or version == "" then
         -- Try alternative version detection methods
         if addonName == "Details" and Details then
             version = Details.version or Details.Version
